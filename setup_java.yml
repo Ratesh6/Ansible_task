@@ -1,0 +1,60 @@
+---
+- name: Setup Java Development Environment
+  hosts: boilerplate_servers
+  become: yes
+  vars:
+    java_version: "openjdk-17-jdk"
+    java_repo: "git@github.com:Retouch-It-Services/devOps-java_boilerplate.git"
+    java_app_dir: "/opt/java-boilerplate"
+
+  tasks:
+    # 1. System Update
+    - name: Update apt repositories
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    # 2. Install Java and Maven
+    - name: Install Java (OpenJDK)
+      apt:
+        name: "{{ java_version }}"
+        state: present
+
+    - name: Install Maven
+      apt:
+        name: maven
+        state: present
+
+    # 3. Create project directory with proper ownership
+    - name: Create application directory
+      file:
+        path: "{{ java_app_dir }}"
+        state: directory
+        owner: "{{ ansible_user | default('ratesh') }}"
+        group: "{{ ansible_user | default('ratesh') }}"
+        mode: '0755'
+
+    # 4. Clone Java Boilerplate Repository (SSH, no sudo)
+    - name: Clone Java boilerplate repository
+      git:
+        repo: "{{ java_repo }}"
+        dest: "{{ java_app_dir }}"
+        version: main
+        accept_hostkey: yes
+        key_file: "/home/ratesh/.ssh/id_ed25519"
+      become: false   # Run as your normal user
+
+    # 5. Verify Build
+    - name: Verify Java build with Maven
+      command: mvn clean package
+      args:
+        chdir: "{{ java_app_dir }}"
+      ignore_errors: yes
+
+    # 6. Permissions (just in case)
+    - name: Set permissions for Java project
+      file:
+        path: "{{ java_app_dir }}"
+        owner: "{{ ansible_user | default('ratesh') }}"
+        group: "{{ ansible_user | default('ratesh') }}"
+        recurse: yes
